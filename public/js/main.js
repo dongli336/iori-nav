@@ -177,9 +177,50 @@ document.addEventListener('DOMContentLoaded', function() {
   // ========== 搜索功能 ==========
   const searchInputs = document.querySelectorAll('.search-input-target');
   const sitesGrid = document.getElementById('sitesGrid');
+  let currentSearchEngine = 'local'; // Default to local
+
+  // Search Engine Switching Logic
+  const engineOptions = document.querySelectorAll('.search-engine-option');
+  engineOptions.forEach(option => {
+      option.addEventListener('click', () => {
+          currentSearchEngine = option.dataset.engine;
+          
+          // Update UI: Sync all option sets (desktop/mobile)
+          const allOptions = document.querySelectorAll('.search-engine-option');
+          allOptions.forEach(opt => {
+              if (opt.dataset.engine === currentSearchEngine) {
+                  opt.classList.add('active');
+              } else {
+                  opt.classList.remove('active');
+              }
+          });
+          
+          // Update Placeholder
+          let placeholder = '搜索书签...';
+          switch (currentSearchEngine) {
+              case 'google': placeholder = 'Google 搜索...'; break;
+              case 'baidu': placeholder = '百度搜索...'; break;
+              case 'bing': placeholder = 'Bing 搜索...'; break;
+          }
+          
+          searchInputs.forEach(input => {
+              input.placeholder = placeholder;
+              input.focus();
+              // If switching back to local, trigger filter immediately
+              if (currentSearchEngine === 'local') {
+                  input.dispatchEvent(new Event('input'));
+              }
+          });
+      });
+  });
   
   searchInputs.forEach(input => {
+    // Local Search Input Handler
     input.addEventListener('input', function() {
+        // If external engine is selected, do not filter local sites (optional, but better UX)
+        // But keeping it might be confusing. Let's filter only if local.
+        if (currentSearchEngine !== 'local') return;
+
         const keyword = this.value.toLowerCase().trim();
         // Sync other inputs
         searchInputs.forEach(otherInput => {
@@ -203,6 +244,23 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         updateHeading(keyword);
+    });
+
+    // External Search Enter Handler
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && currentSearchEngine !== 'local') {
+            e.preventDefault();
+            const query = this.value.trim();
+            if (query) {
+                let url = '';
+                switch (currentSearchEngine) {
+                    case 'google': url = `https://www.google.com/search?q=${encodeURIComponent(query)}`; break;
+                    case 'baidu': url = `https://www.baidu.com/s?wd=${encodeURIComponent(query)}`; break;
+                    case 'bing': url = `https://www.bing.com/search?q=${encodeURIComponent(query)}`; break;
+                }
+                if (url) window.open(url, '_blank');
+            }
+        }
     });
   });
   
@@ -235,16 +293,26 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   
   // ========== 一言 API ==========
-  fetch('https://v1.hitokoto.cn')
-    .then(res => res.json())
-    .then(data => {
-      const hitokoto = document.getElementById('hitokoto_text');
-      if (hitokoto) {
-        hitokoto.href = `https://hitokoto.cn/?uuid=${data.uuid}`;
-        hitokoto.innerText = data.hitokoto;
-      }
-    })
-    .catch(console.error);
+  const hitokotoContainer = document.querySelector('#hitokoto').parentElement;
+  console.log('[Debug] hitokotoContainer:', hitokotoContainer);
+  if (hitokotoContainer) {
+      console.log('[Debug] hitokotoContainer.classList:', hitokotoContainer.classList);
+      console.log('[Debug] contains hidden?', hitokotoContainer.classList.contains('hidden'));
+  }
+  // 检查容器是否被隐藏，如果隐藏则不发起请求
+  if (hitokotoContainer && !hitokotoContainer.classList.contains('hidden')) {
+    console.log('[Debug] Fetching hitokoto...');
+    fetch('https://v1.hitokoto.cn')
+      .then(res => res.json())
+      .then(data => {
+        const hitokoto = document.getElementById('hitokoto_text');
+        if (hitokoto) {
+          hitokoto.href = `https://hitokoto.cn/?uuid=${data.uuid}`;
+          hitokoto.innerText = data.hitokoto;
+        }
+      })
+      .catch(console.error);
+  }
 
   // ========== Horizontal Menu Overflow Logic ==========
   const navContainer = document.getElementById('horizontalCategoryNav');

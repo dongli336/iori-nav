@@ -478,3 +478,32 @@
 #horizontalMoreDropdown .menu-item-wrapper:hover > .dropdown-menu {
   transform: translateX(0) translateY(0);
 }
+
+/* ========================================= */
+/* 搜索引擎选项样式 */
+/* ========================================= */
+.search-engine-option {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    opacity: 0.6;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.9); /* 默认白色 */
+}
+
+.search-engine-option:hover {
+    opacity: 0.8;
+}
+
+.search-engine-option.active {
+    opacity: 1;
+    font-weight: 700;
+}
+
+/* 自定义壁纸模式下的颜色 */
+.custom-wallpaper .search-engine-option {
+    color: #374151; /* gray-700 */
+}
+
+.custom-wallpaper .search-engine-option.active {
+    color: #2563eb; /* primary-600 */
+}

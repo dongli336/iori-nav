@@ -149,7 +149,17 @@ export async function onRequest(context) {
   let layoutHideLinks = false;
   let layoutHideCategory = false;
   let layoutHideTitle = false;
+  let homeTitleSize = '';
+  let homeTitleColor = '';
   let layoutHideSubtitle = false;
+  let homeSubtitleSize = '';
+  let homeSubtitleColor = '';
+  let homeHideStats = false;
+  let homeStatsSize = '';
+  let homeStatsColor = '';
+  let homeHideHitokoto = false;
+  let homeHitokotoSize = '';
+  let homeHitokotoColor = '';
   let layoutGridCols = '4';
   let layoutCustomWallpaper = '';
   let layoutMenuLayout = 'horizontal';
@@ -163,14 +173,43 @@ export async function onRequest(context) {
   let wallpaperCid360 = '36';
 
   try {
-    const { results } = await env.NAV_DB.prepare("SELECT key, value FROM settings WHERE key IN ('layout_hide_desc', 'layout_hide_links', 'layout_hide_category', 'layout_hide_title', 'layout_hide_subtitle', 'layout_grid_cols', 'layout_custom_wallpaper', 'layout_menu_layout', 'layout_random_wallpaper', 'bing_country', 'layout_enable_frosted_glass', 'layout_frosted_glass_intensity', 'layout_enable_bg_blur', 'layout_bg_blur_intensity', 'wallpaper_source', 'wallpaper_cid_360')").all();
+    const keys = [
+        'layout_hide_desc', 'layout_hide_links', 'layout_hide_category',
+        'layout_hide_title', 'home_title_size', 'home_title_color',
+        'layout_hide_subtitle', 'home_subtitle_size', 'home_subtitle_color',
+        'home_hide_stats', 'home_stats_size', 'home_stats_color',
+        'home_hide_hitokoto', 'home_hitokoto_size', 'home_hitokoto_color',
+        'layout_grid_cols', 'layout_custom_wallpaper', 'layout_menu_layout',
+        'layout_random_wallpaper', 'bing_country',
+        'layout_enable_frosted_glass', 'layout_frosted_glass_intensity',
+        'layout_enable_bg_blur', 'layout_bg_blur_intensity',
+        'wallpaper_source', 'wallpaper_cid_360'
+    ];
+    const placeholders = keys.map(() => '?').join(',');
+    const { results } = await env.NAV_DB.prepare(`SELECT key, value FROM settings WHERE key IN (${placeholders})`).bind(...keys).all();
+
     if (results) {
       results.forEach(row => {
         if (row.key === 'layout_hide_desc') layoutHideDesc = row.value === 'true';
         if (row.key === 'layout_hide_links') layoutHideLinks = row.value === 'true';
         if (row.key === 'layout_hide_category') layoutHideCategory = row.value === 'true';
+        
         if (row.key === 'layout_hide_title') layoutHideTitle = row.value === 'true';
+        if (row.key === 'home_title_size') homeTitleSize = row.value;
+        if (row.key === 'home_title_color') homeTitleColor = row.value;
+
         if (row.key === 'layout_hide_subtitle') layoutHideSubtitle = row.value === 'true';
+        if (row.key === 'home_subtitle_size') homeSubtitleSize = row.value;
+        if (row.key === 'home_subtitle_color') homeSubtitleColor = row.value;
+
+        if (row.key === 'home_hide_stats') homeHideStats = row.value === 'true';
+        if (row.key === 'home_stats_size') homeStatsSize = row.value;
+        if (row.key === 'home_stats_color') homeStatsColor = row.value;
+
+        if (row.key === 'home_hide_hitokoto') homeHideHitokoto = row.value === 'true';
+        if (row.key === 'home_hitokoto_size') homeHitokotoSize = row.value;
+        if (row.key === 'home_hitokoto_color') homeHitokotoColor = row.value;
+
         if (row.key === 'layout_grid_cols') layoutGridCols = row.value;
         if (row.key === 'layout_custom_wallpaper') layoutCustomWallpaper = row.value;
         if (row.key === 'layout_menu_layout') layoutMenuLayout = row.value;
@@ -430,12 +469,47 @@ export async function onRequest(context) {
   const siteName = env.SITE_NAME || '灰色轨迹';
   const siteDescription = env.SITE_DESCRIPTION || '一个优雅、快速、易于部署的书签（网址）收藏与分享平台，完全基于 Cloudflare 全家桶构建';
   const footerText = env.FOOTER_TEXT || '曾梦想仗剑走天涯';
+
+  // Build Style Strings
+  const getStyleStr = (size, color) => {
+    let s = '';
+    if (size) s += `font-size: ${size}px;`;
+    if (color) s += `color: ${color} !important;`;
+    return s ? `style="${s}"` : '';
+  };
   
-  const mainTitleHtml = layoutHideTitle ? '' : `<h1 class="mt-4 text-3xl md:text-4xl font-semibold tracking-tight ${titleColorClass}">{{SITE_NAME}}</h1>`;
-  const subtitleHtml = layoutHideSubtitle ? '' : `<p class="mt-3 text-sm md:text-base ${subTextColorClass} leading-relaxed">{{SITE_DESCRIPTION}}</p>`;
-  
-  const horizontalTitleHtml = layoutHideTitle ? '' : `<h1 class="text-3xl md:text-4xl font-bold tracking-tight mb-3 ${titleColorClass}">{{SITE_NAME}}</h1>`;
-  const horizontalSubtitleHtml = layoutHideSubtitle ? '' : `<p class="${subTextColorClass} opacity-90 text-sm md:text-base">{{SITE_DESCRIPTION}}</p>`;
+  const titleStyle = getStyleStr(homeTitleSize, homeTitleColor);
+  const subtitleStyle = getStyleStr(homeSubtitleSize, homeSubtitleColor);
+  const statsStyle = getStyleStr(homeStatsSize, homeStatsColor);
+  const hitokotoStyle = getStyleStr(homeHitokotoSize, homeHitokotoColor);
+  const hitokotoContent = homeHideHitokoto ? '' : '疏影横斜水清浅,暗香浮动月黄昏。';
+
+  // Determine if the stats row should be rendered with padding/margin
+  const shouldRenderStatsRow = !homeHideStats || !homeHideHitokoto;
+  const statsRowPyClass = shouldRenderStatsRow ? 'py-8' : 'pt-8';
+  const statsRowMbClass = shouldRenderStatsRow ? 'mb-6' : 'mb-4';
+  const statsRowHiddenClass = shouldRenderStatsRow ? '' : 'hidden';
+
+  const horizontalTitleHtml = layoutHideTitle ? '' : `<h1 class="text-3xl md:text-4xl font-bold tracking-tight mb-3 ${titleColorClass}" ${titleStyle}>{{SITE_NAME}}</h1>`;
+  const horizontalSubtitleHtml = layoutHideSubtitle ? '' : `<p class="${subTextColorClass} opacity-90 text-sm md:text-base" ${subtitleStyle}>{{SITE_DESCRIPTION}}</p>`;
+
+  // 搜索引擎选项 HTML
+  const searchEngineOptions = `
+    <div class="flex justify-center items-center space-x-5 mb-4 text-sm select-none" id="searchEngineWrapper">
+        <label class="search-engine-option active" data-engine="local">
+            <span>站内</span>
+        </label>
+        <label class="search-engine-option" data-engine="google">
+            <span>Google</span>
+        </label>
+        <label class="search-engine-option" data-engine="baidu">
+            <span>Baidu</span>
+        </label>
+        <label class="search-engine-option" data-engine="bing">
+            <span>Bing</span>
+        </label>
+    </div>
+  `;
 
   const verticalHeaderContent = `
       <div class="max-w-4xl mx-auto text-center relative z-10 ${themeClass} py-8">
@@ -445,10 +519,13 @@ export async function onRequest(context) {
         </div>
 
         <div class="relative max-w-xl mx-auto">
-            <input type="text" name="search" placeholder="搜索书签..." class="search-input-target w-full pl-12 pr-4 py-3.5 rounded-2xl transition-all shadow-lg outline-none focus:outline-none focus:ring-2 ${searchInputClass}" autocomplete="off">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-4 top-3.5 ${searchIconClass}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+            ${searchEngineOptions}
+            <div class="relative">
+                <input type="text" name="search" placeholder="搜索书签..." class="search-input-target w-full pl-12 pr-4 py-3.5 rounded-2xl transition-all shadow-lg outline-none focus:outline-none focus:ring-2 ${searchInputClass}" autocomplete="off">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-4 top-3.5 ${searchIconClass}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </div>
         </div>
       </div>`;
       
@@ -460,10 +537,13 @@ export async function onRequest(context) {
         </div>
 
         <div class="relative max-w-xl mx-auto mb-8">
-            <input id="headerSearchInput" type="text" name="search" placeholder="搜索书签..." class="search-input-target w-full pl-12 pr-4 py-3.5 rounded-2xl transition-all shadow-lg outline-none focus:outline-none focus:ring-2 ${searchInputClass}" autocomplete="off">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-4 top-3.5 ${searchIconClass}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+            ${searchEngineOptions}
+            <div class="relative">
+                <input id="headerSearchInput" type="text" name="search" placeholder="搜索书签..." class="search-input-target w-full pl-12 pr-4 py-3.5 rounded-2xl transition-all shadow-lg outline-none focus:outline-none focus:ring-2 ${searchInputClass}" autocomplete="off">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-4 top-3.5 ${searchIconClass}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </div>
         </div>
         
         <div class="relative max-w-5xl mx-auto">
@@ -535,7 +615,7 @@ export async function onRequest(context) {
       ? 'bg-transparent py-8 px-6 mt-12 border-none shadow-none text-black'
       : 'bg-white py-8 px-6 mt-12 border-t border-primary-100';
       
-  const hitokotoClass = isCustomWallpaper ? 'text-black' : 'text-gray-500';
+  const hitokotoClass = (isCustomWallpaper ? 'text-black' : 'text-gray-500') + ' ml-auto';
 
   const templateResponse = await env.ASSETS.fetch(new URL('/index.html', request.url));
   let html = await templateResponse.text();
@@ -589,6 +669,14 @@ export async function onRequest(context) {
     .replace('{{HEADING_TEXT}}', headingText)
     .replace('{{HEADING_DEFAULT}}', headingDefaultAttr)
     .replace('{{HEADING_ACTIVE}}', headingActiveAttr)
+    .replace('{{STATS_VISIBLE}}', homeHideStats ? 'hidden' : '')
+    .replace('{{STATS_STYLE}}', statsStyle)
+    .replace('{{HITOKOTO_VISIBLE}}', homeHideHitokoto ? 'hidden' : '')
+    .replace('{{STATS_ROW_PY_CLASS}}', statsRowPyClass)
+    .replace('{{STATS_ROW_MB_CLASS}}', statsRowMbClass)
+    .replace('{{STATS_ROW_HIDDEN}}', statsRowHiddenClass)
+    .replace('{{HITOKOTO_CONTENT}}', hitokotoContent)
+    .replace(/{{HITOKOTO_STYLE}}/g, hitokotoStyle)
     .replace('{{SITES_GRID}}', sitesGridMarkup)
     .replace('{{CURRENT_YEAR}}', new Date().getFullYear())
     .replace('grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6', gridClass)
